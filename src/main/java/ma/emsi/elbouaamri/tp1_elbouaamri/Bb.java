@@ -9,7 +9,6 @@ import jakarta.inject.Named;
 
 import java.io.Serializable;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
@@ -24,48 +23,29 @@ public class Bb implements Serializable {
     private String reponse;
     private StringBuilder conversation = new StringBuilder();
 
+    private String texteRequeteJson;
+    private String texteReponseJson;
+
     @Inject
     private FacesContext facesContext;
 
-    public Bb() {
-    }
+    @Inject
+    private JsonUtilPourGemini jsonUtil; // 🔹 Injection du composant pour envoyer la requête LLM
 
-    // Getters et Setters
-    public String getRoleSysteme() {
-        return roleSysteme;
-    }
+    public Bb() {}
 
-    public void setRoleSysteme(String roleSysteme) {
-        this.roleSysteme = roleSysteme;
-    }
-
-    public boolean isRoleSystemeChangeable() {
-        return roleSystemeChangeable;
-    }
-
-    public String getQuestion() {
-        return question;
-    }
-
-    public void setQuestion(String question) {
-        this.question = question;
-    }
-
-    public String getReponse() {
-        return reponse;
-    }
-
-    public void setReponse(String reponse) {
-        this.reponse = reponse;
-    }
-
-    public String getConversation() {
-        return conversation.toString();
-    }
-
-    public void setConversation(String conversation) {
-        this.conversation = new StringBuilder(conversation);
-    }
+    // --- Getters et Setters ---
+    public String getRoleSysteme() { return roleSysteme; }
+    public void setRoleSysteme(String roleSysteme) { this.roleSysteme = roleSysteme; }
+    public boolean isRoleSystemeChangeable() { return roleSystemeChangeable; }
+    public String getQuestion() { return question; }
+    public void setQuestion(String question) { this.question = question; }
+    public String getReponse() { return reponse; }
+    public void setReponse(String reponse) { this.reponse = reponse; }
+    public String getConversation() { return conversation.toString(); }
+    public void setConversation(String conversation) { this.conversation = new StringBuilder(conversation); }
+    public String getTexteRequeteJson() { return texteRequeteJson; }
+    public String getTexteReponseJson() { return texteReponseJson; }
 
     public List<SelectItem> getRolesSysteme() {
         if (this.listeRolesSysteme == null) {
@@ -85,7 +65,7 @@ public class Bb implements Serializable {
             this.listeRolesSysteme.add(new SelectItem(role, "Traducteur Anglais-Français"));
 
             role = """
-                    Your are a travel guide. If the user type the name of a country or of a town,
+                    You are a travel guide. If the user type the name of a country or of a town,
                     you tell them what are the main places to visit in the country or the town
                     and you tell them the average price of a meal.
                     """;
@@ -95,9 +75,7 @@ public class Bb implements Serializable {
     }
 
     /**
-     * Analyse le type de question (interrogative, explicative, déclarative) et génère une réponse
-     * contextualisée avec le rôle système.
-     * @return null pour rester sur la même page.
+     * Envoie la question à l’API Gemini via JsonUtilPourGemini.
      */
     public String envoyer() {
         if (question == null || question.isBlank()) {
@@ -107,49 +85,30 @@ public class Bb implements Serializable {
             return null;
         }
 
-        // Liste de mots-clés pour identifier les types de questions
-        List<String> interrogativeKeywords = Arrays.asList("comment", "pourquoi", "quoi", "quand", "où", "qui", "est-ce");
-        List<String> explicativeKeywords = Arrays.asList("explique", "décris", "défini", "analyse");
+        try {
+            jsonUtil.setSystemRole(this.roleSysteme);
 
-        // Analyse de la question
-        String lowerCaseQuestion = question.toLowerCase(Locale.FRENCH).trim();
-        String questionType;
-        boolean isInterrogative = false;
-        boolean isExplicative = false;
+            // 🔹 jsonUtil.envoyerRequete retourne un String (le texte de la réponse)
+            String reponseApi = jsonUtil.envoyerRequete(question);
 
-        // Vérifier les mots-clés
-        for (String keyword : interrogativeKeywords) {
-            if (lowerCaseQuestion.startsWith(keyword)) {
-                isInterrogative = true;
-                break;
-            }
-        }
-        for (String keyword : explicativeKeywords) {
-            if (lowerCaseQuestion.contains(keyword)) {
-                isExplicative = true;
-                break;
-            }
+            this.reponse = reponseApi;
+            this.texteRequeteJson = jsonUtil.getTexteRequeteJson();
+            this.texteReponseJson = "(voir logs ou console pour la réponse JSON complète)";
+
+        } catch (Exception e) {
+            FacesMessage message =
+                    new FacesMessage(FacesMessage.SEVERITY_ERROR,
+                            "Problème de connexion avec l'API du LLM",
+                            "Problème de connexion avec l'API du LLM : " + e.getMessage());
+            facesContext.addMessage(null, message);
+            return null;
         }
 
-        // Déterminer le type de question
-        if (isInterrogative) {
-            questionType = "interrogative";
-            reponse = "En tant que " + getRoleLabel() + ", je détecte une question interrogative : \"" + question + "\"";
-        } else if (isExplicative) {
-            questionType = "explicative";
-            reponse = "En tant que " + getRoleLabel() + ", je détecte une question explicative : \"" + question + "\"";
-        } else {
-            questionType = "déclarative";
-            reponse = "En tant que " + getRoleLabel() + ", je détecte une question déclarative : \"" + question + "\"";
-        }
-
-        // Ajouter le rôle système au début de la conversation si elle est vide
+        // 🔹 Mise à jour de la conversation
         if (this.conversation.isEmpty()) {
-            reponse = roleSysteme.toUpperCase(Locale.FRENCH) + "\n" + reponse;
             this.roleSystemeChangeable = false;
         }
 
-        // Ajouter à la conversation
         afficherConversation();
         return null;
     }
@@ -167,7 +126,11 @@ public class Bb implements Serializable {
     }
 
     private void afficherConversation() {
-        this.conversation.append("== User:\n").append(question).append("\n== Serveur:\n").append(reponse).append("\n");
+        this.conversation.append("== User:\n")
+                .append(question)
+                .append("\n== Serveur:\n")
+                .append(reponse)
+                .append("\n");
     }
 
     public String nouveauChat() {

@@ -33,22 +33,22 @@ public class LlmClientPourGemini implements Serializable {
     /**
      * Constructeur : récupère la clé API et initialise le client REST
      */
-    public LlmClientPourGemini(String texteRequeteJson, String texteReponseJson, String s) {
+    public LlmClientPourGemini() {
         // Récupère la clé secrète depuis la variable d'environnement
         this.key = System.getenv("GEMINI_KEY");
 
-        System.out.println("=== DEBUG GEMINI CLIENT ===");
-        System.out.println("GEMINI_KEY présente : " + (this.key != null && !this.key.isEmpty()));
+        LOGGER.info("=== DEBUG GEMINI CLIENT ===");
+        LOGGER.info("GEMINI_KEY présente : " + (this.key != null && !this.key.isEmpty()));
         if (this.key != null && !this.key.isEmpty()) {
-            System.out.println("Longueur clé : " + this.key.length());
-            System.out.println("Début clé : " + this.key.substring(0, Math.min(10, this.key.length())) + "...");
-            System.out.println("Format clé valide : " + this.key.startsWith("AIza"));
+            LOGGER.info("Longueur clé : " + this.key.length());
+            LOGGER.info("Début clé : " + this.key.substring(0, Math.min(10, this.key.length())) + "...");
+            LOGGER.info("Format clé valide : " + this.key.startsWith("AIza"));
         } else {
-            System.err.println("ERREUR : GEMINI_KEY est NULL ou vide !");
-            System.err.println("Variables d'environnement disponibles contenant 'KEY' ou 'GEMINI' :");
+            LOGGER.severe("ERREUR : GEMINI_KEY est NULL ou vide !");
+            LOGGER.severe("Variables d'environnement disponibles contenant 'KEY' ou 'GEMINI' :");
             System.getenv().keySet().forEach(k -> {
                 if (k.toUpperCase().contains("GEMINI") || k.toUpperCase().contains("KEY")) {
-                    System.err.println("  - " + k);
+                    LOGGER.severe("  - " + k);
                 }
             });
         }
@@ -62,7 +62,7 @@ public class LlmClientPourGemini implements Serializable {
 
         // Vérification du format de la clé
         if (!this.key.startsWith("AIza")) {
-            System.err.println("ATTENTION : La clé API ne commence pas par 'AIza'. " +
+            LOGGER.warning("ATTENTION : La clé API ne commence pas par 'AIza'. " +
                     "Assurez-vous d'utiliser une clé API Google valide.");
         }
 
@@ -70,24 +70,13 @@ public class LlmClientPourGemini implements Serializable {
         this.clientRest = ClientBuilder.newClient();
 
         // API GRATUITE - Modèles disponibles selon la liste de votre compte
-
-        // Option 1 : gemini-2.5-flash (RECOMMANDÉ - Le plus récent, juin 2025)
         String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
-        // Option 2 : gemini-2.0-flash (Stable, janvier 2025)
-        // String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
-
-        // Option 3 : gemini-flash-latest (Pointe vers la dernière version)
-        // String url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent";
-
-        // Tous ces modèles sont GRATUITS et supportent generateContent
-
-        // Création du WebTarget avec la clé API
         this.target = clientRest.target(url).queryParam("key", this.key);
 
-        System.out.println("URL configurée : " + url);
-        System.out.println("Modèle utilisé : " + extractModelName(url));
-        System.out.println("Version API : " + extractApiVersion(url));
-        System.out.println("===========================");
+        LOGGER.info("URL configurée : " + url);
+        LOGGER.info("Modèle utilisé : " + extractModelName(url));
+        LOGGER.info("Version API : " + extractApiVersion(url));
+        LOGGER.info("===========================");
     }
 
     /**
@@ -97,16 +86,12 @@ public class LlmClientPourGemini implements Serializable {
      * @return réponse REST de l'API (corps en JSON).
      */
     public Response envoyerRequete(Entity requestEntity) {
-        System.out.println("=== ENVOI REQUÊTE À GEMINI ===");
-
+        LOGGER.info("=== ENVOI REQUÊTE À GEMINI ===");
         Invocation.Builder request = target.request(MediaType.APPLICATION_JSON_TYPE);
-
-        // Envoie la requête POST au LLM
         Response response = request.post(requestEntity);
-
-        System.out.println("Status HTTP reçu : " + response.getStatus());
-        System.out.println("Status Info : " + response.getStatusInfo());
-        System.out.println("==============================");
+        LOGGER.info("Status HTTP reçu : " + response.getStatus());
+        LOGGER.info("Status Info : " + response.getStatusInfo());
+        LOGGER.info("==============================");
         return response;
     }
 
@@ -116,6 +101,7 @@ public class LlmClientPourGemini implements Serializable {
     public void closeClient() {
         if (this.clientRest != null) {
             this.clientRest.close();
+            LOGGER.info("Client REST fermé.");
         }
     }
 
@@ -138,11 +124,5 @@ public class LlmClientPourGemini implements Serializable {
             return "v1";
         }
         return "inconnue";
+    }
 }
-}
-
-
-
-
-
-
