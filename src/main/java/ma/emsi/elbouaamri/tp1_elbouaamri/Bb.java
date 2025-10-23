@@ -25,6 +25,28 @@ public class Bb implements Serializable {
 
     private String texteRequeteJson;
     private String texteReponseJson;
+    private boolean debug = true; // Pour activer l’affichage du JSON
+
+
+
+    public boolean isDebug() {
+        return debug;
+    }
+
+    public void setDebug(boolean debug) {
+        this.debug = debug;
+    }
+
+
+
+
+    public String getT() {
+        return texteReponseJson;
+    }
+
+    public void setTexteReponseJson(String texteReponseJson) {
+        this.texteReponseJson = texteReponseJson;
+    }
 
     @Inject
     private FacesContext facesContext;
@@ -86,14 +108,11 @@ public class Bb implements Serializable {
         }
 
         try {
-            jsonUtil.setSystemRole(this.roleSysteme);
-
-            // 🔹 jsonUtil.envoyerRequete retourne un String (le texte de la réponse)
-            String reponseApi = jsonUtil.envoyerRequete(question);
-
-            this.reponse = reponseApi;
-            this.texteRequeteJson = jsonUtil.getTexteRequeteJson();
-            this.texteReponseJson = "(voir logs ou console pour la réponse JSON complète)";
+            // Envoi de la requête et récupération de la réponse finale
+            String reponseTextuelle = jsonUtil.envoyerRequete(question);
+            this.texteRequeteJson = jsonUtil.getTexteRequeteJson(); // JSON envoyé
+            this.texteReponseJson = reponseTextuelle;                // réponse reçue
+            this.reponse = reponseTextuelle;                         // texte de la réponse
 
         } catch (Exception e) {
             FacesMessage message =
@@ -104,14 +123,17 @@ public class Bb implements Serializable {
             return null;
         }
 
-        // 🔹 Mise à jour de la conversation
+        // 🔹 Verrouiller le rôle après le premier envoi
         if (this.conversation.isEmpty()) {
+            reponse = roleSysteme.toUpperCase(Locale.FRENCH) + "\n" + reponse;
             this.roleSystemeChangeable = false;
         }
 
+        // 🔹 Ajouter à la conversation
         afficherConversation();
         return null;
     }
+
 
     /**
      * Récupère le libellé du rôle système pour une réponse conviviale.
